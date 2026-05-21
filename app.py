@@ -15,106 +15,79 @@ st.sidebar.markdown("---")
 menu = st.sidebar.radio("Main Menu", ["Dashboard Home", "Onboarded Vendors", "Approached Leads"])
 st.sidebar.markdown("---")
 
+# Helper function to find columns regardless of exact name/casing
+def find_column(df, keywords):
+    for col in df.columns:
+        if any(keyword in col.lower() for keyword in keywords):
+            return col
+    return None
+
 # 3. View Logic
 if menu == "Dashboard Home":
-    st.title("📈 Executive Vendor Insights")
-    st.markdown("Overview of vendor network health and pipeline performance.")
+    st.title("📈 Vendor Pipeline Overview")
     
-    # --- KPI SECTION ---
+    # --- BULLETPROOF KPI SECTION ---
+    # Bypassing st.metric to avoid CSS conflicts hiding the labels
     metrics = get_kpis()
-    c1, c2, c3 = st.columns(3)
-    
-    # Safe metric calculations with explicit labeling
-    c1.metric(label="📦 Total Onboarded", value=metrics["total_onboarded"])
-    c2.metric(label="🎯 Leads in Pipeline", value=metrics["total_approached"])
-    
     conv_rate = (metrics['active_vendors'] / max(metrics['total_approached'], 1)) * 100
-    c3.metric(label="⚡ Activation Efficiency", value=f"{conv_rate:.1f}%")
+    
+    st.markdown(f"""
+    <div style="display: flex; gap: 20px; margin-bottom: 30px;">
+        <div style="flex: 1; background-color: white; padding: 20px; border-radius: 10px; border: 1px solid #E5E7EB; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">
+            <p style="margin: 0; color: #6B7280; font-size: 14px; font-weight: 600;">📦 TOTAL ONBOARDED</p>
+            <h2 style="margin: 5px 0 0 0; color: #111827;">{metrics['total_onboarded']}</h2>
+        </div>
+        <div style="flex: 1; background-color: white; padding: 20px; border-radius: 10px; border: 1px solid #E5E7EB; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">
+            <p style="margin: 0; color: #6B7280; font-size: 14px; font-weight: 600;">🎯 LEADS IN PIPELINE</p>
+            <h2 style="margin: 5px 0 0 0; color: #111827;">{metrics['total_approached']}</h2>
+        </div>
+        <div style="flex: 1; background-color: white; padding: 20px; border-radius: 10px; border: 1px solid #E5E7EB; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">
+            <p style="margin: 0; color: #6B7280; font-size: 14px; font-weight: 600;">⚡ PIPELINE CONVERSION</p>
+            <h2 style="margin: 5px 0 0 0; color: #111827;">{conv_rate:.1f}%</h2>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
 
-    st.markdown("---")
-
-    # --- ADVANCED ANALYTICS ---
+    # --- RELEVANT ANALYTICS ---
     col_a, col_b = st.columns(2)
 
     with col_a:
-        st.subheader("📅 Onboarding Velocity")
-        df_onb = st.session_state.onboarded_df.copy()
+        st.subheader("📊 Pipeline Status Breakdown")
+        df_app = st.session_state.approached_df
         
-        # Pointing to the new standardized column: 'vendor_onboard_date'
-        if not df_onb.empty and 'vendor_onboard_date' in df_onb.columns:
-            time_df = df_onb.dropna(subset=['vendor_onboard_date']).copy()
-            if not time_df.empty:
-                time_df = time_df.sort_values('vendor_onboard_date')
-                time_df['Cumulative Vendors'] = range(1, len(time_df) + 1)
-                
-                fig_time = px.line(
-                    time_df, x='vendor_onboard_date', y='Cumulative Vendors', 
-                    title='Vendor Acquisition Over Time',
-                    color_discrete_sequence=['#2563EB']
-                )
-                fig_time.update_layout(xaxis_title="Date", yaxis_title="Total Vendors")
-                st.plotly_chart(fig_time, use_container_width=True)
-            else:
-                st.info("No valid dates found in 'Vendor Onboard Date' column.")
-        else:
-            st.info("Awaiting 'Vendor Onboard Date' data.")
-
-    with col_b:
-        st.subheader("📊 Pipeline Breakdown")
-        df_app = st.session_state.approached_df.copy()
-        
-        # Pointing to the new auto-extracted column: 'file_status'
         if not df_app.empty and 'file_status' in df_app.columns:
             stage_counts = df_app['file_status'].value_counts().reset_index()
-            stage_counts.columns = ['Pipeline Stage', 'Number of Leads']
+            stage_counts.columns = ['Pipeline Stage', 'Count']
             
             fig_bar = px.bar(
-                stage_counts, x='Number of Leads', y='Pipeline Stage', orientation='h', 
-                title='Leads by Current Status', color='Number of Leads', 
-                color_continuous_scale='Viridis'
+                stage_counts, x='Count', y='Pipeline Stage', orientation='h', 
+                color='Count', color_continuous_scale='Blues'
             )
-            fig_bar.update_layout(yaxis={'categoryorder':'total ascending'})
+            fig_bar.update_layout(yaxis={'categoryorder':'total ascending'}, showlegend=False, margin=dict(l=0, r=0, t=30, b=0))
             st.plotly_chart(fig_bar, use_container_width=True)
         else:
-            st.info("No pipeline status data available.")
+            st.info("Pipeline data is currently empty.")
 
-    st.markdown("---")
-    
-    # --- GEOGRAPHIC & CATEGORY DISTRIBUTION ---
-    c3, c4 = st.columns(2)
-    
-    with c3:
-        st.subheader("🌎 Global Footprint")
-        if not df_onb.empty and 'country' in df_onb.columns:
-            geo_data = df_onb['country'].dropna().value_counts().reset_index()
-            geo_data.columns = ['Country', 'Vendor Count']
-            
-            fig_geo = px.choropleth(
-                geo_data, locations="Country", locationmode='country names', 
-                color="Vendor Count", title="Vendors by Country", 
-                color_continuous_scale='Blues'
-            )
-            st.plotly_chart(fig_geo, use_container_width=True)
-        else:
-            st.info("Awaiting 'Country' data.")
-
-    with c4:
-        st.subheader("🏷️ Top Categories")
-        # The standardized column might be 'vendor_type' or 'category' depending on the file
-        cat_col = 'vendor_type' if 'vendor_type' in df_onb.columns else ('category' if 'category' in df_onb.columns else None)
+    with col_b:
+        st.subheader("🏷️ Business Segments")
+        df_onb = st.session_state.onboarded_df
+        
+        # Smartly look for the category/type column
+        cat_col = find_column(df_onb, ['category', 'type', 'segment'])
         
         if cat_col and not df_onb.empty:
-            cat_data = df_onb[cat_col].dropna().value_counts().nlargest(10).reset_index()
-            cat_data.columns = ['Business Segment', 'Count']
+            cat_data = df_onb[cat_col].dropna().value_counts().reset_index()
+            cat_data.columns = ['Segment', 'Count']
             
-            fig_cat = px.treemap(
-                cat_data, path=['Business Segment'], values='Count', 
-                title='Top 10 Business Segments',
+            # Simple Donut chart for the 3 categories
+            fig_pie = px.pie(
+                cat_data, names='Segment', values='Count', hole=0.5,
                 color_discrete_sequence=px.colors.qualitative.Pastel
             )
-            st.plotly_chart(fig_cat, use_container_width=True)
+            fig_pie.update_layout(margin=dict(l=0, r=0, t=30, b=0))
+            st.plotly_chart(fig_pie, use_container_width=True)
         else:
-            st.info("Awaiting 'Vendor Type' or 'Category' data.")
+            st.info("Could not locate a 'Vendor Type' or 'Category' column in the onboarded data.")
 
 elif menu == "Onboarded Vendors":
     st.title("📂 Onboarded Vendor Directory")
