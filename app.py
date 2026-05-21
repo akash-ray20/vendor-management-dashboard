@@ -40,16 +40,41 @@ if menu == "Dashboard Home":
     </div>
     """, unsafe_allow_html=True)
 
-    # --- DONUT CHARTS SECTION ---
+    # --- ROW 1: TEAM PERFORMANCE (FULL WIDTH) ---
+    st.subheader("👥 Lead Sourcing by Team")
+    df_app = st.session_state.approached_df
+
+    if not df_app.empty and 'first_contacted_by' in df_app.columns:
+        # CLEANING LOGIC: Split the name at '(', take the first part, strip spaces, and Title Case it.
+        # This turns "Sid (05-07-2025)" into just "Sid"
+        df_app['team_member_clean'] = df_app['first_contacted_by'].astype(str).str.split('(').str[0].str.strip().str.title()
+        
+        # Remove 'Nan' and blank entries
+        team_data = df_app[(df_app['team_member_clean'] != 'Nan') & (df_app['team_member_clean'] != '')]
+        team_counts = team_data['team_member_clean'].value_counts().reset_index()
+        team_counts.columns = ['Team Member', 'Leads Generated']
+        
+        if not team_counts.empty:
+            fig_team = px.bar(
+                team_counts, x='Leads Generated', y='Team Member', orientation='h', 
+                color='Leads Generated', color_continuous_scale='Teal',
+                text='Leads Generated' # Adds the exact number inside the bar
+            )
+            fig_team.update_layout(yaxis={'categoryorder':'total ascending'}, showlegend=False, margin=dict(l=0, r=0, t=10, b=0), height=300)
+            st.plotly_chart(fig_team, use_container_width=True)
+        else:
+            st.info("No valid team member names found.")
+    else:
+        st.info("Team sourcing data (First Contacted By) is currently empty.")
+
+    st.markdown("---")
+
+    # --- ROW 2: DONUT CHARTS ---
     col_a, col_b = st.columns(2)
 
     with col_a:
         st.subheader("🛍️ Top Product Categories")
-        df_app = st.session_state.approached_df
-        
-        # Point specifically to the 'category' column in the approached leads
         if not df_app.empty and 'category' in df_app.columns:
-            # Clean categories to group identical items (e.g., "beauty" and "Beauty")
             df_app['category_clean'] = df_app['category'].astype(str).str.title().str.strip()
             cat_data = df_app[df_app['category_clean'] != 'Nan']['category_clean'].value_counts().nlargest(10).reset_index()
             cat_data.columns = ['Product Category', 'Count']
@@ -67,7 +92,6 @@ if menu == "Dashboard Home":
         st.subheader("🏷️ Business Model Segments")
         df_onb = st.session_state.onboarded_df
         
-        # Point to the 'vendor_type' column (Dropship, Wholesale, etc.)
         if not df_onb.empty and 'vendor_type' in df_onb.columns:
             seg_data = df_onb['vendor_type'].dropna().value_counts().reset_index()
             seg_data.columns = ['Segment', 'Count']
