@@ -88,7 +88,7 @@ def apply_custom_css():
                 background: transparent;
             }
         </style>
-    """, unsafe_content_safe=True)
+    """, unsafe_allow_html=True)
 
 def card_container(title, content):
     """
@@ -99,4 +99,4 @@ def card_container(title, content):
             <h3 style="margin-top: 0; color: #374151;">{title}</h3>
             {content}
         </div>
-    """, unsafe_content_safe=True)
+    """, unsafe_allow_html=True)
