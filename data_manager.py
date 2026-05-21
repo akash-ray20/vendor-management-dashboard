@@ -9,33 +9,54 @@ DATA_DIR = "data"
 def load_and_sort_data():
     """
     Scans the /data folder and separates files into 'Onboarded' and 'Approached'
-    based on the keywords in their filenames.
+    based on the keywords in their filenames. Handles both CSV and Excel files.
     """
     onboarded_frames = []
     approached_frames = []
     
     if not os.path.exists(DATA_DIR):
-        st.error(f"Directory '{DATA_DIR}' not found!")
+        st.error(f"Directory '{DATA_DIR}' not found. Please ensure your folder is named 'data' (lowercase).")
         return pd.DataFrame(), pd.DataFrame()
 
-    all_files = [f for f in os.listdir(DATA_DIR) if f.endswith('.csv')]
+    all_files = os.listdir(DATA_DIR)
     
+    if len(all_files) == 0:
+        st.warning(f"The '{DATA_DIR}' folder exists, but no files were found inside it.")
+        return pd.DataFrame(), pd.DataFrame()
+
     for filename in all_files:
         file_path = os.path.join(DATA_DIR, filename)
+        
         try:
-            df = pd.read_csv(file_path, low_memory=False)
-            df['source_file'] = filename # Keeps track of which file the row came from
+            # 1. Handle BOTH CSV and Excel files smoothly
+            if filename.lower().endswith('.csv'):
+                # Special handling for Shopperbeats file which has rows above the header
+                if "shopperbeats" in filename.lower():
+                    df = pd.read_csv(file_path, skiprows=5, low_memory=False)
+                else:
+                    df = pd.read_csv(file_path, low_memory=False)
+                    
+            elif filename.lower().endswith(('.xls', '.xlsx')):
+                df = pd.read_excel(file_path, engine='openpyxl')
+                
+            else:
+                continue # Skip non-data files (like .gitkeep or images)
+                
+            # Add the tracking column
+            df['source_file'] = filename
             
-            # KEYWORD LOGIC:
-            # Files with 'Master AU' are Onboarded
-            # Files with 'Track Master' are Approached leads
-            if "Master AU" in filename:
+            # Clean up completely blank rows
+            df = df.dropna(how='all')
+            
+            # 2. Smart Keyword Routing (Case-Insensitive)
+            fn_lower = filename.lower()
+            if "master au" in fn_lower:
                 onboarded_frames.append(df)
-            elif "Track Master" in filename:
+            elif "track master" in fn_lower:
                 approached_frames.append(df)
                 
         except Exception as e:
-            st.error(f"Skipping {filename}: {e}")
+            st.error(f"Error reading {filename}: {e}")
 
     # Combine lists into master DataFrames
     final_onboarded = pd.concat(onboarded_frames, ignore_index=True) if onboarded_frames else pd.DataFrame()
@@ -59,11 +80,11 @@ def get_kpis():
     onboarded = st.session_state.get('onboarded_df', pd.DataFrame())
     approached = st.session_state.get('approached_df', pd.DataFrame())
     
-    # Identify Active vendors based on the 'source_file' name or a status column
+    # Identify Active vendors based on the 'source_file' name
     active_count = 0
-    if not onboarded.empty:
-        # Check if 'Active' is in the filename or a column
-        active_count = len(onboarded[onboarded['source_file'].str.contains('Active', case=False)])
+    if not onboarded.empty and 'source_file' in onboarded.columns:
+        # Check if the row came specifically from the 'Active.csv' onboarded file
+        active_count = len(onboarded[onboarded['source_file'].str.contains('Active', case=False, na=False)])
 
     return {
         "total_onboarded": len(onboarded),
