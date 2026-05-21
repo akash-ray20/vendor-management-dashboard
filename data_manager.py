@@ -5,11 +5,11 @@ import os
 # --- CONFIGURATION ---
 DATA_DIR = "data"
 
-@st.cache_data(show_spinner="Syncing Vendor Database...")
+@st.cache_data(show_spinner="Standardizing Data...")
 def load_and_sort_data():
     """
-    Scans the /data folder and separates files into 'Onboarded' and 'Approached'
-    based on the keywords in their filenames. Handles both CSV and Excel files.
+    Scans the /data folder, loads CSV/Excel files, standardizes key columns,
+    and separates files into 'Onboarded' and 'Approached'.
     """
     onboarded_frames = []
     approached_frames = []
@@ -38,21 +38,30 @@ def load_and_sort_data():
                     
             elif filename.lower().endswith(('.xls', '.xlsx')):
                 df = pd.read_excel(file_path, engine='openpyxl')
-                
             else:
-                continue # Skip non-data files (like .gitkeep or images)
+                continue # Skip non-data files
                 
+            # Clean up completely blank rows
+            df = df.dropna(how='all')
+
+            # --- THE FIX: COLUMN NORMALIZATION ---
+            # Standardize column names so the app knows where to look for charts
+            rename_map = {
+                'Vendor Onboard Date': 'date', 'Onboard Date': 'date',
+                'Country': 'country', 'Nation': 'country',
+                'Vendor Type': 'category', 'Category': 'category',
+                'Vendor Status': 'status', 'Status': 'status'
+            }
+            df = df.rename(columns=lambda x: rename_map.get(x, x))
+            
             # Add the tracking column
             df['source_file'] = filename
             
-            # Clean up completely blank rows
-            df = df.dropna(how='all')
-            
             # 2. Smart Keyword Routing (Case-Insensitive)
             fn_lower = filename.lower()
-            if "master au" in fn_lower:
+            if "master au" in fn_lower or "onboard" in fn_lower:
                 onboarded_frames.append(df)
-            elif "track master" in fn_lower:
+            elif "track master" in fn_lower or "approach" in fn_lower or "lead" in fn_lower:
                 approached_frames.append(df)
                 
         except Exception as e:
