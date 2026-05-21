@@ -4,81 +4,69 @@ import os
 
 # --- CONFIGURATION ---
 DATA_DIR = "data"
-ONBOARDED_DIR = os.path.join(DATA_DIR, "onboarded")
-APPROACHED_DIR = os.path.join(DATA_DIR, "approached")
 
-@st.cache_data(show_spinner="Fetching vendor records...")
-def load_csv_files(directory):
+@st.cache_data(show_spinner="Syncing Vendor Database...")
+def load_and_sort_data():
     """
-    Helper function to find and merge all CSVs in a specific directory.
+    Scans the /data folder and separates files into 'Onboarded' and 'Approached'
+    based on the keywords in their filenames.
     """
-    if not os.path.exists(directory):
-        return pd.DataFrame()
+    onboarded_frames = []
+    approached_frames = []
     
-    all_files = [f for f in os.listdir(directory) if f.endswith('.csv')]
+    if not os.path.exists(DATA_DIR):
+        st.error(f"Directory '{DATA_DIR}' not found!")
+        return pd.DataFrame(), pd.DataFrame()
+
+    all_files = [f for f in os.listdir(DATA_DIR) if f.endswith('.csv')]
     
-    if not all_files:
-        return pd.DataFrame()
-    
-    df_list = []
     for filename in all_files:
-        file_path = os.path.join(directory, filename)
+        file_path = os.path.join(DATA_DIR, filename)
         try:
-            # We use low_memory=False to handle mixed types in large excel-exported CSVs
-            temp_df = pd.read_csv(file_path, low_memory=False)
-            # Add a source column to track which file the data came from (useful for status)
-            temp_df['source_file'] = filename
-            df_list.append(temp_df)
-        except Exception as e:
-            st.error(f"Error loading {filename}: {e}")
+            df = pd.read_csv(file_path, low_memory=False)
+            df['source_file'] = filename # Keeps track of which file the row came from
             
-    return pd.concat(df_list, ignore_index=True) if df_list else pd.DataFrame()
+            # KEYWORD LOGIC:
+            # Files with 'Master AU' are Onboarded
+            # Files with 'Track Master' are Approached leads
+            if "Master AU" in filename:
+                onboarded_frames.append(df)
+            elif "Track Master" in filename:
+                approached_frames.append(df)
+                
+        except Exception as e:
+            st.error(f"Skipping {filename}: {e}")
+
+    # Combine lists into master DataFrames
+    final_onboarded = pd.concat(onboarded_frames, ignore_index=True) if onboarded_frames else pd.DataFrame()
+    final_approached = pd.concat(approached_frames, ignore_index=True) if approached_frames else pd.DataFrame()
+    
+    return final_onboarded, final_approached
 
 def initialize_session_state():
     """
-    Centralized logic to load data into the session state.
-    This ensures data is loaded once and persists during user interactions.
+    Initializes the session state using the updated loading logic.
     """
-    # Initialize Onboarded Data
-    if 'onboarded_df' not in st.session_state:
-        df = load_csv_files(ONBOARDED_DIR)
-        # Basic Clean: Drop completely empty rows/cols
-        st.session_state.onboarded_df = df.dropna(how='all', axis=0).reset_index(drop=True)
-        
-    # Initialize Approached Data
-    if 'approached_df' not in st.session_state:
-        df = load_csv_files(APPROACHED_DIR)
-        st.session_state.approached_df = df.dropna(how='all', axis=0).reset_index(drop=True)
-
-def update_vendor(df_key, index, updated_row):
-    """
-    CRUD Helper: Updates a specific row in the session state dataframe.
-    """
-    st.session_state[df_key].iloc[index] = updated_row
-    # Optional: Logic to save back to CSV could go here
-
-def add_vendor(df_key, new_data_dict):
-    """
-    CRUD Helper: Appends a new vendor to the session state dataframe.
-    """
-    new_row = pd.DataFrame([new_data_dict])
-    st.session_state[df_key] = pd.concat([st.session_state[df_key], new_row], ignore_index=True)
+    if 'onboarded_df' not in st.session_state or 'approached_df' not in st.session_state:
+        onboarded, approached = load_and_sort_data()
+        st.session_state.onboarded_df = onboarded.reset_index(drop=True)
+        st.session_state.approached_df = approached.reset_index(drop=True)
 
 def get_kpis():
     """
-    Returns a dictionary of key metrics for the dashboard.
+    Calculates metrics based on the combined data.
     """
     onboarded = st.session_state.get('onboarded_df', pd.DataFrame())
     approached = st.session_state.get('approached_df', pd.DataFrame())
     
-    metrics = {
+    # Identify Active vendors based on the 'source_file' name or a status column
+    active_count = 0
+    if not onboarded.empty:
+        # Check if 'Active' is in the filename or a column
+        active_count = len(onboarded[onboarded['source_file'].str.contains('Active', case=False)])
+
+    return {
         "total_onboarded": len(onboarded),
         "total_approached": len(approached),
-        "active_vendors": 0,
-        "pending_leads": 0
+        "active_vendors": active_count,
     }
-    
-    if not onboarded.empty and 'Vendor Status' in onboarded.columns:
-        metrics["active_vendors"] = len(onboarded[onboarded['Vendor Status'] == 'Active'])
-        
-    return metrics
