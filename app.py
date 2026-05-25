@@ -8,12 +8,32 @@ from styles import apply_custom_css
 st.set_page_config(page_title="VendorFlow AI", page_icon="📊", layout="wide")
 apply_custom_css()
 
-# CSS Hotfix for the "White Text on White Background" input bug
+# --- THE BULLETPROOF CSS FIX ---
 st.markdown("""
     <style>
-        div[data-baseweb="select"] > div, div[data-baseweb="select"] li, span, input {
+        /* 1. The Text Input Field */
+        input[type="text"] {
+            color: #111827 !important;
+            background-color: #ffffff !important;
+        }
+        
+        /* 2. The Selected Text in the Dropdown Box */
+        div[data-baseweb="select"] span {
             color: #111827 !important;
         }
+        
+        /* 3. The Floating Dropdown Menu (Portal) - Fixes the white-on-white bug */
+        ul[data-baseweb="menu"] li {
+            color: #111827 !important;
+            background-color: #ffffff !important;
+        }
+        
+        /* 4. Dropdown Hover State */
+        ul[data-baseweb="menu"] li:hover {
+            background-color: #f3f4f6 !important;
+        }
+        
+        /* 5. The Labels above the inputs */
         .stSelectbox label p, .stTextInput label p {
             color: #374151 !important;
             font-weight: 600 !important;
@@ -158,7 +178,7 @@ elif menu == "Onboarded Vendors":
         st.markdown(f"**Currently showing {len(filtered_df)} of {len(df_onb)} total vendors.**")
         st.markdown("---")
 
-        # 2. TABBED INTERFACE (SWAPPED ORDER)
+        # 2. TABBED INTERFACE (Insights first, Directory second)
         tab1, tab2 = st.tabs(["⚙️ Operational Insights", "📋 Directory Data"])
 
         with tab1:
