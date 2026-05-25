@@ -40,17 +40,32 @@ if menu == "Dashboard Home":
     </div>
     """, unsafe_allow_html=True)
 
-    # --- ROW 1: TEAM PERFORMANCE (FULL WIDTH) ---
+   # --- ROW 1: TEAM PERFORMANCE (FULL WIDTH) ---
     st.subheader("👥 Lead Sourcing by Team")
-    df_app = st.session_state.approached_df
+    df_app = st.session_state.approached_df.copy()
 
-    if not df_app.empty and 'first_contacted_by' in df_app.columns:
-        # CLEANING LOGIC: Split the name at '(', take the first part, strip spaces, and Title Case it.
-        # This turns "Sid (05-07-2025)" into just "Sid"
-        df_app['team_member_clean'] = df_app['first_contacted_by'].astype(str).str.split('(').str[0].str.strip().str.title()
+    if not df_app.empty:
+        # 1. Combine columns safely: Fallback to 'data_got_from' if 'first_contacted_by' is empty
+        col1 = 'first_contacted_by' if 'first_contacted_by' in df_app.columns else None
+        col2 = 'data_got_from' if 'data_got_from' in df_app.columns else None
         
-        # Remove 'Nan' and blank entries
-        team_data = df_app[(df_app['team_member_clean'] != 'Nan') & (df_app['team_member_clean'] != '')]
+        if col1 and col2:
+            df_app['team_member'] = df_app[col1].fillna(df_app[col2])
+        elif col1:
+            df_app['team_member'] = df_app[col1]
+        elif col2:
+            df_app['team_member'] = df_app[col2]
+        else:
+            df_app['team_member'] = 'Unknown'
+
+        # 2. Clean names: Remove dates in parentheses and capitalize properly
+        df_app['team_member_clean'] = df_app['team_member'].astype(str).str.split('(').str[0].str.strip().str.title()
+        
+        # 3. Filter out junk data that aren't actually people
+        bad_names = ['Nan', 'None', '', 'Email And Form', 'Website', 'Google', 'Network', 'Applied Through Website']
+        team_data = df_app[~df_app['team_member_clean'].isin(bad_names)]
+        
+        # 4. Plot the Chart
         team_counts = team_data['team_member_clean'].value_counts().reset_index()
         team_counts.columns = ['Team Member', 'Leads Generated']
         
@@ -58,14 +73,14 @@ if menu == "Dashboard Home":
             fig_team = px.bar(
                 team_counts, x='Leads Generated', y='Team Member', orientation='h', 
                 color='Leads Generated', color_continuous_scale='Teal',
-                text='Leads Generated' # Adds the exact number inside the bar
+                text='Leads Generated'
             )
             fig_team.update_layout(yaxis={'categoryorder':'total ascending'}, showlegend=False, margin=dict(l=0, r=0, t=10, b=0), height=300)
             st.plotly_chart(fig_team, use_container_width=True)
         else:
             st.info("No valid team member names found.")
     else:
-        st.info("Team sourcing data (First Contacted By) is currently empty.")
+        st.info("Team sourcing data is currently empty.")
 
     st.markdown("---")
 
