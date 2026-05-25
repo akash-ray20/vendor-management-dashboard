@@ -8,32 +8,54 @@ from styles import apply_custom_css
 st.set_page_config(page_title="VendorFlow AI", page_icon="📊", layout="wide")
 apply_custom_css()
 
-# --- THE BULLETPROOF CSS FIX ---
+# --- THE DEFINITIVE CSS FIX (TABS, BUTTONS, & INPUTS) ---
 st.markdown("""
     <style>
-        /* 1. The Text Input Field */
+        /* 1. Fix Tab Text Visibility */
+        button[data-baseweb="tab"] span, button[data-baseweb="tab"] p {
+            color: #e5e7eb !important; /* Visible light gray for inactive tabs */
+            font-weight: 600 !important;
+            font-size: 16px !important;
+        }
+        button[data-baseweb="tab"][aria-selected="true"] span, button[data-baseweb="tab"][aria-selected="true"] p {
+            color: #3b82f6 !important; /* Bright blue for the active tab */
+        }
+        
+        /* 2. Download Button (Blue text on dark background) */
+        [data-testid="stDownloadButton"] button p {
+            color: #60a5fa !important; /* Bright sky blue */
+            font-weight: 700 !important;
+        }
+        [data-testid="stDownloadButton"] button {
+            border: 2px solid #3b82f6 !important;
+            background-color: transparent !important;
+        }
+        [data-testid="stDownloadButton"] button:hover {
+            border-color: #60a5fa !important;
+            background-color: rgba(59, 130, 246, 0.1) !important;
+        }
+
+        /* 3. The Text Input Field (White box, dark text) */
         input[type="text"] {
             color: #111827 !important;
             background-color: #ffffff !important;
         }
         
-        /* 2. The Selected Text in the Dropdown Box */
+        /* 4. The Selected Text in the Dropdown Box */
         div[data-baseweb="select"] span {
             color: #111827 !important;
         }
         
-        /* 3. The Floating Dropdown Menu (Portal) - Fixes the white-on-white bug */
+        /* 5. The Floating Dropdown Menu (Fixes white-on-white) */
         ul[data-baseweb="menu"] li {
             color: #111827 !important;
             background-color: #ffffff !important;
         }
-        
-        /* 4. Dropdown Hover State */
         ul[data-baseweb="menu"] li:hover {
             background-color: #f3f4f6 !important;
         }
         
-        /* 5. The Labels above the inputs */
+        /* 6. The Labels above the inputs */
         .stSelectbox label p, .stTextInput label p {
             color: #374151 !important;
             font-weight: 600 !important;
