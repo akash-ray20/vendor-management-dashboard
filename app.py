@@ -40,12 +40,12 @@ if menu == "Dashboard Home":
     </div>
     """, unsafe_allow_html=True)
 
-   # --- ROW 1: TEAM PERFORMANCE (FULL WIDTH) ---
+    # --- ROW 1: TEAM PERFORMANCE (FULL WIDTH) ---
     st.subheader("👥 Lead Sourcing by Team")
     df_app = st.session_state.approached_df.copy()
 
     if not df_app.empty:
-        # 1. Combine columns safely: Fallback to 'data_got_from' if 'first_contacted_by' is empty
+        # Check both columns to ensure nobody is left out
         col1 = 'first_contacted_by' if 'first_contacted_by' in df_app.columns else None
         col2 = 'data_got_from' if 'data_got_from' in df_app.columns else None
         
@@ -58,14 +58,13 @@ if menu == "Dashboard Home":
         else:
             df_app['team_member'] = 'Unknown'
 
-        # 2. Clean names: Remove dates in parentheses and capitalize properly
+        # Clean names: Remove dates and standardize casing
         df_app['team_member_clean'] = df_app['team_member'].astype(str).str.split('(').str[0].str.strip().str.title()
         
-        # 3. Filter out junk data that aren't actually people
+        # Filter out junk data
         bad_names = ['Nan', 'None', '', 'Email And Form', 'Website', 'Google', 'Network', 'Applied Through Website']
         team_data = df_app[~df_app['team_member_clean'].isin(bad_names)]
         
-        # 4. Plot the Chart
         team_counts = team_data['team_member_clean'].value_counts().reset_index()
         team_counts.columns = ['Team Member', 'Leads Generated']
         
