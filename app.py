@@ -7,6 +7,20 @@ from styles import apply_custom_css
 # 1. Page Configuration
 st.set_page_config(page_title="VendorFlow AI", page_icon="📊", layout="wide")
 apply_custom_css()
+
+# CSS Hotfix for the "White Text on White Background" input bug
+st.markdown("""
+    <style>
+        div[data-baseweb="select"] > div, div[data-baseweb="select"] li, span, input {
+            color: #111827 !important;
+        }
+        .stSelectbox label p, .stTextInput label p {
+            color: #374151 !important;
+            font-weight: 600 !important;
+        }
+    </style>
+""", unsafe_allow_html=True)
+
 initialize_session_state()
 
 # 2. Sidebar Navigation
@@ -22,7 +36,7 @@ def find_col(df, keywords):
             return col
     return None
 
-# --- VIEW 1: DASHBOARD HOME (Untouched from our last fix) ---
+# --- VIEW 1: DASHBOARD HOME ---
 if menu == "Dashboard Home":
     st.title("📈 Vendor Pipeline Overview")
     
@@ -105,7 +119,7 @@ if menu == "Dashboard Home":
         else: st.info("Could not locate the 'Vendor Type' column.")
 
 
-# --- VIEW 2: ONBOARDED VENDORS (THE NEW UPGRADE) ---
+# --- VIEW 2: ONBOARDED VENDORS ---
 elif menu == "Onboarded Vendors":
     st.title("📂 Onboarded Vendor Directory")
     st.markdown("Manage, filter, and analyze your active operational partners.")
@@ -116,7 +130,6 @@ elif menu == "Onboarded Vendors":
         # 1. SMART SEARCH & FILTERS
         st.subheader("🔍 Smart Filter Engine")
         
-        # Safely locate columns regardless of how Excel named them
         name_col = find_col(df_onb, ['name', 'company'])
         type_col = find_col(df_onb, ['vendor_type', 'type'])
         country_col = find_col(df_onb, ['country', 'nation'])
@@ -145,22 +158,10 @@ elif menu == "Onboarded Vendors":
         st.markdown(f"**Currently showing {len(filtered_df)} of {len(df_onb)} total vendors.**")
         st.markdown("---")
 
-        # 2. TABBED INTERFACE
-        tab1, tab2 = st.tabs(["📋 Directory Data", "⚙️ Operational Insights"])
+        # 2. TABBED INTERFACE (SWAPPED ORDER)
+        tab1, tab2 = st.tabs(["⚙️ Operational Insights", "📋 Directory Data"])
 
         with tab1:
-            # The Export Button
-            csv_data = filtered_df.to_csv(index=False).encode('utf-8')
-            st.download_button(
-                label="📥 Export Current View to CSV",
-                data=csv_data,
-                file_name='vendor_report.csv',
-                mime='text/csv',
-            )
-            # The clean, filtered table
-            st.dataframe(filtered_df, use_container_width=True, height=500)
-
-        with tab2:
             st.markdown("### Logistics & Financial Terms")
             st.write("*Note: These charts update automatically based on your search filters above.*")
             
@@ -178,7 +179,6 @@ elif menu == "Onboarded Vendors":
                     st.info("Payment terms data not available for this selection.")
                     
             with c2:
-                # Look for PO integration or inventory frequency
                 integ_col = find_col(filtered_df, ['integration', 'po_integration', 'invoice'])
                 if integ_col and not filtered_df.empty:
                     integ_data = filtered_df[integ_col].dropna().value_counts().reset_index()
@@ -191,10 +191,20 @@ elif menu == "Onboarded Vendors":
                 else:
                     st.info("Operational methodology data not available for this selection.")
 
+        with tab2:
+            csv_data = filtered_df.to_csv(index=False).encode('utf-8')
+            st.download_button(
+                label="📥 Export Current View to CSV",
+                data=csv_data,
+                file_name='vendor_report.csv',
+                mime='text/csv',
+            )
+            st.dataframe(filtered_df, use_container_width=True, height=500)
+
     else:
         st.info("No onboarded vendor data available. Please check the data folder.")
 
-# --- VIEW 3: APPROACHED LEADS (Untouched) ---
+# --- VIEW 3: APPROACHED LEADS ---
 elif menu == "Approached Leads":
     st.title("🎯 Approached Leads & Tracking")
     st.dataframe(st.session_state.approached_df, use_container_width=True)
